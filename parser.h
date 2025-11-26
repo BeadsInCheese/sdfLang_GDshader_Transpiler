@@ -5,6 +5,11 @@
 #include "token.h"
 #include <unordered_map>
 #include <string>
+
+std::string replaceAll(std::string s,
+    const std::string& sequence,
+    const std::string& toReplace);
+
 template <typename T,typename U>
 std::unique_ptr<U> cast_unique(std::unique_ptr<T> ptr){
     if (U* raw = dynamic_cast<U*>(ptr.release())) {
@@ -17,21 +22,22 @@ public:
     virtual std::wstring print(bool isLast, const std::wstring& prefix);
     virtual std::string emit();
 };
+enum class expressionType { BASE,ACCESS,POINT, NUMBER, IDENTIFIER, VEC2, VEC3, VEC4, SHAPE, BINARY, UNARY };
 class expression {
-    enum oper { PLUS, MINUS, DIV, MUL, DOT, CROSS };
+
 public:
     virtual token_type getExprType();
     virtual std::wstring print(bool isLast, const std::wstring& prefix);
     virtual std::string emit();
     virtual std::unique_ptr<expression> getAsRHS();
+    virtual expressionType getType();
+    virtual expression* getProperty(std::string key);
+    virtual void setProperty(std::string key,expression* value);
 };
 
 struct NamedValue {
     token_type type_information;
     std::unique_ptr<expression> value;
-    float position[3];
-    float rotation[3];
-    float scale[3];
 };
 class Parser {
     std::unordered_map<token_type, int> bindingPowers = { {token_type::PLUS,1 },{token_type::MINUS,1 },{token_type::MUL,3 },{token_type::DIV,3 },{token_type::OPENPAREN,-1 },{token_type::COMMA,-1 },{token_type::UNION,1 },{token_type::INTERSECTION,1 } };
@@ -52,6 +58,21 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
+    };
+    class AccessPropertyExpr :public expression {
+    public:
+        std::unique_ptr<expression> lhs;
+        std::string propertyName;
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class UnaryExpression :public expression {
     public:
@@ -61,6 +82,9 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class IdentifierExpression :public expression {
     public:
@@ -71,6 +95,9 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class NumberExpression :public expression {
     public:
@@ -81,7 +108,54 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
+    class PointXExpression :public expression {
+    public:
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
+    };
+    class PointYExpression :public expression {
+    public:
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
+    };
+    class PointZExpression :public expression {
+    public:
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
+    };
+    class PointExpression :public expression {
+    public:
+        std::unique_ptr<PointXExpression> x=std::make_unique<PointXExpression>();
+        std::unique_ptr<PointYExpression> y = std::make_unique<PointYExpression>();
+        std::unique_ptr<PointZExpression> z = std::make_unique<PointZExpression>();
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
+    };
+
     class Vec2Expression :public expression {
     public:
         std::unique_ptr<expression> x;
@@ -91,6 +165,9 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class Vec3Expression :public expression {
     public:
@@ -102,6 +179,9 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class Vec4Expression :public expression {
     public:
@@ -114,6 +194,10 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class ShapeExpression :public expression {
     public:
@@ -126,6 +210,9 @@ public:
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
         token_type getExprType()override;
+        expressionType getType()override;
+        expression* getProperty(std::string key)override;
+        void setProperty(std::string key, expression* value)override;
     };
     class ExpressionStatement :public statement {
     public:
@@ -141,6 +228,14 @@ public:
     class assignmentStatement :public statement {
     public:
         std::unique_ptr<IdentifierExpression> lhs;
+        std::unique_ptr<expression> rhs;
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+    };
+    class assignPropertyStatement :public statement {
+    public:
+        std::unique_ptr<IdentifierExpression> lhs;
+        std::string property;
         std::unique_ptr<expression> rhs;
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
@@ -173,6 +268,8 @@ public:
     std::unique_ptr < statement> parseStatement(std::vector<token>& tokens, int& ptr);
     std::unique_ptr <statement> parseBlockStatement(std::vector<token>& tokens, int& ptr);
     std::unique_ptr < statement> parseAssignmentStatement(std::vector<token>& tokens, int& ptr);
+    std::unique_ptr < statement> parseAssignPropertyStatement(std::vector<token>& tokens, int& ptr);
+    std::unique_ptr < expression> parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr);
     std::unique_ptr < statement> parseDeclarationStatement(std::vector<token>& tokens, int& ptr);
     std::unique_ptr < statement> parseReturnStatement(std::vector<token>& tokens, int& ptr);
 

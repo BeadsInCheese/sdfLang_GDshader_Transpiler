@@ -56,6 +56,17 @@ token_type Parser::IdentifierExpression::getExprType()
 {
     return (*variables)[identifier].type_information;
 }
+expressionType Parser::IdentifierExpression::getType()
+{
+    return expressionType::IDENTIFIER;
+}
+expression* Parser::IdentifierExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+void Parser::IdentifierExpression::setProperty(std::string key, expression* value)
+{
+}
 std::wstring Parser::NumberExpression::print(bool isLast, const std::wstring& prefix)
 {
     return prefix+ L"└── "+std::to_wstring(number) + L"\n";
@@ -73,8 +84,30 @@ token_type Parser::NumberExpression::getExprType()
 {
     return token_type::SCALAR;
 }
+expressionType Parser::NumberExpression::getType()
+{
+    return expressionType::NUMBER;
+}
+expression* Parser::NumberExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+void Parser::NumberExpression::setProperty(std::string key, expression* value)
+{
+}
 std::unique_ptr<expression> expression::getAsRHS(){
     return std::make_unique<expression>();
+}
+expressionType expression::getType()
+{
+    return expressionType::BASE;
+}
+expression* expression::getProperty(std::string key)
+{
+    return nullptr;
+}
+void expression::setProperty(std::string key, expression* value)
+{
 }
 token_type expression::getExprType()
 {
@@ -112,6 +145,9 @@ std::string Parser::BinaryExpression::emit()
     std::string code = std::string("");
     switch (oper.typ) {
     case token_type::MINUS:
+        if (lhs->getExprType() == token_type::SCALAR && rhs->getExprType() == token_type::SCALAR) {
+            
+        }
         code += lhs->emit() + "-" + rhs->emit();
         break;
     case token_type::PLUS:
@@ -136,9 +172,26 @@ std::string Parser::BinaryExpression::emit()
 
 std::unique_ptr<expression> Parser::BinaryExpression::getAsRHS()
 {
+
+    auto trhs = rhs->getAsRHS();
+    auto tlhs = lhs->getAsRHS();
+    if (trhs->getType() == expressionType::NUMBER && trhs->getType() == expressionType::NUMBER) {
+        if (oper.val == "+") {
+            return std::make_unique<NumberExpression>(dynamic_cast<NumberExpression*>(trhs.get())->number + dynamic_cast<NumberExpression*>(tlhs.get())->number);
+        }
+        if (oper.val == "-") {
+            return std::make_unique<NumberExpression>(dynamic_cast<NumberExpression*>(trhs.get())->number - dynamic_cast<NumberExpression*>(tlhs.get())->number);
+        }
+        if (oper.val == "*") {
+            return std::make_unique<NumberExpression>(dynamic_cast<NumberExpression*>(trhs.get())->number * dynamic_cast<NumberExpression*>(tlhs.get())->number);
+        }
+        if (oper.val == "/") {
+            return std::make_unique<NumberExpression>(dynamic_cast<NumberExpression*>(trhs.get())->number / dynamic_cast<NumberExpression*>(tlhs.get())->number);
+        }
+    }
     std::unique_ptr<BinaryExpression> b = std::make_unique<BinaryExpression>();
-    b->rhs = rhs->getAsRHS();
-    b->lhs = lhs->getAsRHS();
+    b->rhs = std::move(trhs);
+    b->lhs = std::move(tlhs);
     b->oper = oper;
     return std::move(b);
 }
@@ -163,6 +216,20 @@ token_type Parser::BinaryExpression::getExprType()
         return token_type::SHAPE;
     }
     return token_type();
+}
+
+expressionType Parser::BinaryExpression::getType()
+{
+    return expressionType::BINARY;
+}
+
+expression* Parser::BinaryExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+
+void Parser::BinaryExpression::setProperty(std::string key, expression* value)
+{
 }
 
 std::wstring Parser::UnaryExpression::print(bool isLast, const std::wstring& prefix)
@@ -194,6 +261,15 @@ std::string Parser::UnaryExpression::emit()
 
 std::unique_ptr<expression> Parser::UnaryExpression::getAsRHS()
 {
+    auto trhs= rhs->getAsRHS();
+    if (trhs->getType() == expressionType::NUMBER) {
+        if (oper.val == "+") {
+            return std::make_unique<NumberExpression>(dynamic_cast<NumberExpression*>(trhs.get())->number);
+        }
+        if (oper.val == "-") {
+            return std::make_unique<NumberExpression>(-dynamic_cast<NumberExpression*>(trhs.get())->number);
+        }
+    }
     std::unique_ptr<UnaryExpression> unary = std::make_unique<UnaryExpression>();
     unary->oper = oper;
     unary->rhs = rhs->getAsRHS();
@@ -203,6 +279,20 @@ std::unique_ptr<expression> Parser::UnaryExpression::getAsRHS()
 token_type Parser::UnaryExpression::getExprType()
 {
     return rhs->getExprType();
+}
+
+expressionType Parser::UnaryExpression::getType()
+{
+    return expressionType::UNARY;
+}
+
+expression* Parser::UnaryExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+
+void Parser::UnaryExpression::setProperty(std::string key, expression* value)
+{
 }
 
 
@@ -284,12 +374,15 @@ std::unique_ptr<expression> Parser::parseUnaryExpression(std::vector<token>& tok
        return std::make_unique<ShapeExpression>(param1.get());
    }
     else if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
+       if (peek(tokens, ptr).typ == token_type::DOT) {
+           return parseAccessPropertyExpr(tokens,ptr);
+        }
         return parseIdentifierExpression(tokens,ptr);
 
     }
     else if (look(tokens, ptr).typ == token_type::POINT) {
         consume(tokens,ptr);
-        return std::make_unique<IdentifierExpression>("POINT",variables.get());
+        return std::make_unique<PointExpression>();
 
     }
     std::wcout << L"WTF invalid expression" << "\n";
@@ -349,6 +442,9 @@ std::unique_ptr<statement> Parser::parseStatement(std::vector<token>& tokens, in
         return parseDeclarationStatement(tokens, ptr);
     }
     if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
+        if (peek(tokens, ptr).typ == token_type::IDENTIFIER) {
+            return parseAssignPropertyStatement(tokens,ptr);
+        }
         return parseAssignmentStatement(tokens, ptr);
     }
     if (look(tokens, ptr).typ == token_type::RETURN) {
@@ -378,6 +474,29 @@ std::unique_ptr < statement> Parser::parseAssignmentStatement(std::vector<token>
     expect(tokens, ptr, token_type::SEMICOLON);
     return std::move(assignment);
 }
+
+std::unique_ptr<statement> Parser::parseAssignPropertyStatement(std::vector<token>& tokens, int& ptr)
+{
+    std::unique_ptr<assignPropertyStatement> assignment = std::make_unique<assignPropertyStatement>();
+
+    assignment->lhs = parseIdentifierExpression(tokens, ptr);
+    expect(tokens, ptr, token_type::DOT);
+    assignment->property = parseIdentifierExpression(tokens, ptr)->identifier;
+    token t = expect(tokens, ptr, token_type::ASSIGN);
+    assignment->rhs = parseExpression(tokens, ptr, -1);
+    expect(tokens, ptr, token_type::SEMICOLON);
+    return std::move(assignment);
+}
+
+std::unique_ptr<expression> Parser::parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr)
+{
+    std::unique_ptr<AccessPropertyExpr> access = std::make_unique<AccessPropertyExpr>();
+    access->lhs = parseExpression(tokens, ptr);
+    expect(tokens, ptr, token_type::DOT);
+    access->propertyName = consume(tokens, ptr).val;
+    return std::move(access);
+}
+
 
 std::unique_ptr<statement> Parser::parseDeclarationStatement(std::vector<token>& tokens, int& ptr)
 {
@@ -469,7 +588,7 @@ std::wstring Parser::returnStatement::print(bool isLast, const std::wstring& pre
 
 std::string Parser::returnStatement::emit()
 {
-    return "return " + returnValue->emit() + ";";
+    return "return " + returnValue->getAsRHS()->emit() + ";";
 }
 
 std::string Parser::ExpressionStatement::emit()
@@ -502,17 +621,6 @@ std::string Parser::declarationStatement::emit()
     NamedValue n;
     n.type_information = type_information.typ;
     n.value = rhs->getAsRHS();
-    n.position[0] = 0.0f; 
-    n.position[1] = 0.0f;
-    n.position[2] = 0.0f;
-
-    n.rotation[0] = 0.0f;
-    n.rotation[1] = 0.0f;
-    n.rotation[2] = 0.0f;
-
-    n.scale[0] = 0.0f;
-    n.scale[0] = 0.0f;
-    n.scale[0] = 0.0f;
     (*variables)[lhs->identifier] = std::move(n);
     return std::string("");
 };
@@ -545,6 +653,35 @@ token_type Parser::Vec2Expression::getExprType()
     return token_type::VEC2;
 }
 
+expressionType Parser::Vec2Expression::getType()
+{
+    return expressionType::VEC2;
+}
+
+expression* Parser::Vec2Expression::getProperty(std::string key)
+{
+    if (key == "x") {
+        return x.get();
+    }
+    if (key == "y") {
+        return y.get();
+    }
+    return nullptr;
+}
+
+void Parser::Vec2Expression::setProperty(std::string key, expression* value)
+{
+    if (value->getExprType() == token_type::SCALAR) {
+        if (key == "x") {
+            x = std::unique_ptr<expression>(value);
+        }
+        if (key == "y") {
+            y = std::unique_ptr<expression>(value);
+        }
+    }
+    
+}
+
 
 
 Parser::Vec3Expression::Vec3Expression(expression* value,expression* value2, expression* value3)
@@ -572,6 +709,41 @@ std::unique_ptr<expression> Parser::Vec3Expression::getAsRHS()
 token_type Parser::Vec3Expression::getExprType()
 {
     return token_type::VEC3;
+}
+
+expressionType Parser::Vec3Expression::getType()
+{
+    return expressionType::VEC3;
+}
+
+expression* Parser::Vec3Expression::getProperty(std::string key)
+{
+    if (key == "x") {
+        return x.get();
+    }
+    if (key == "y") {
+        return y.get();
+    }
+    if (key == "z") {
+        return z.get();
+    }
+
+    return nullptr;
+}
+
+void Parser::Vec3Expression::setProperty(std::string key, expression* value)
+{
+    if (value->getExprType() == token_type::SCALAR) {
+        if (key == "x") {
+            x = std::unique_ptr<expression>(value);
+        }
+        if (key == "y") {
+            y = std::unique_ptr<expression>(value);
+        }
+        if (key == "z") {
+            z = std::unique_ptr<expression>(value);
+        }
+    }
 }
 
 
@@ -605,6 +777,46 @@ token_type Parser::Vec4Expression::getExprType()
     return token_type::VEC4;
 }
 
+expressionType Parser::Vec4Expression::getType()
+{
+    return expressionType::VEC4;
+}
+
+expression* Parser::Vec4Expression::getProperty(std::string key)
+{
+    if (key == "x") {
+        return x.get();
+    }
+    if (key == "y") {
+        return y.get();
+    }
+    if (key == "z") {
+        return z.get();
+    }
+    if (key == "w") {
+        return w.get();
+    }
+    return nullptr;
+}
+
+void Parser::Vec4Expression::setProperty(std::string key, expression* value)
+{
+    if (value->getExprType() == token_type::SCALAR) {
+        if (key == "x") {
+            x = std::unique_ptr<expression>(value);
+        }
+        if (key == "y") {
+            y = std::unique_ptr<expression>(value);
+        }
+        if (key == "z") {
+            z = std::unique_ptr<expression>(value);
+        }
+        if (key == "w") {
+            w = std::unique_ptr<expression>(value);
+        }
+    }
+}
+
 Parser::ShapeExpression::ShapeExpression(expression* SDF)
 {
     sdf = SDF->getAsRHS();
@@ -621,7 +833,66 @@ std::wstring Parser::ShapeExpression::print(bool isLast, const std::wstring& pre
 
 std::string Parser::ShapeExpression::emit()
 {
-    return std::string("shape: ")+sdf->emit();
+    float px;
+    float py;
+    float pz;
+    float rx;
+    float ry;
+    float rz;
+    if (pos->x->getType() == expressionType::NUMBER) {
+            px=dynamic_cast<NumberExpression*>(pos->x.get())->number;
+    }else{
+        std::wcout << L"shape pos must be available at compile time. \n";
+    }
+    if (pos->y->getType() == expressionType::NUMBER) {
+        py=dynamic_cast<NumberExpression*>(pos->y.get())->number;
+    }
+    else {
+        std::wcout << L"shape pos must be available at compile time. \n";
+    }
+    if (pos->z->getType() == expressionType::NUMBER) {
+        pz=dynamic_cast<NumberExpression*>(pos->z.get())->number;
+    }
+    else {
+        std::wcout << L"shape pos must be available at compile time. \n";
+    }
+    if (rot->x->getType() == expressionType::NUMBER) {
+        rx=dynamic_cast<NumberExpression*>(rot->x.get())->number;
+    }
+    else {
+        std::wcout << L"shape pos must be available at compile time. \n";
+    }
+    if (rot->y->getType() == expressionType::NUMBER) {
+        ry=dynamic_cast<NumberExpression*>(rot->y.get())->number;
+    }
+    else {
+        std::wcout << L"shape pos must be available at compile time. \n";
+    }
+    if (rot->z->getType() == expressionType::NUMBER) {
+        rz=dynamic_cast<NumberExpression*>(rot->z.get())->number;
+    }
+    else {
+        std::wcout << L"shape pos must be available at compile time. \n";
+    }
+    std::string sc = scale->emit();
+
+    
+
+    std::string vec1 = "vec4("+std::to_string(std::cos(  ry  )*std::cos( rz ))+", "
+        + std::to_string(sin( rx )*sin( ry )*cos( rz ) + cos( rx  )*sin( rz ))+", "
+        + std::to_string(-cos( rx )*sin( ry )*cos(rz ) + sin( rx )*sin( rz  ))+", 0)";
+
+    std::string vec2 = "vec4("+std::to_string(-cos( ry  )*sin( rz  ))+", "+
+        std::to_string(-sin( rx  )*sin( ry )*sin( rz  ) + cos( rx )*cos( rz  ))+", "+
+        std::to_string(cos( rx  )*sin( ry )*sin( rz  ) + sin( rx )*cos( rz ))+", 0)";
+
+    std::string vec3 = "vec4("+ std::to_string(sin( ry ))+", "
+        + std::to_string(-sin( rx  )*cos(  ry  ))+", "
+        + std::to_string(cos(rx )*cos(  ry ))+", 0)";
+
+    std::string vec4 = "vec4(" + std::to_string(px) + "," + std::to_string(py) + "," + std::to_string(pz) + ",1)";
+
+    return "(" + replaceAll(sdf->emit(), "POINT", "invert(mat4("+ vec1+vec2+vec3+vec4+ "))*POINT/" + sc) + "*" + sc + ")";
 }
      
 std::unique_ptr<expression> Parser::ShapeExpression::getAsRHS()
@@ -636,4 +907,242 @@ std::unique_ptr<expression> Parser::ShapeExpression::getAsRHS()
 token_type Parser::ShapeExpression::getExprType()
 {
     return token_type::SHAPE;
+}
+
+expressionType Parser::ShapeExpression::getType()
+{
+    return expressionType::SHAPE;
+}
+
+expression* Parser::ShapeExpression::getProperty(std::string key)
+{
+    if (key == "pos") {
+        return pos.get();
+    }
+    if (key == "rot") {
+        return rot.get();
+    }
+    if (key == "scale") {
+        return scale.get();
+    }
+    return nullptr;
+}
+
+void Parser::ShapeExpression::setProperty(std::string key, expression* value)
+{
+    if (value->getExprType() == token_type::VEC3) {
+        if (key == "pos") {
+            pos = std::unique_ptr<Vec3Expression>(dynamic_cast<Vec3Expression*>(value));
+        }
+        if (key == "rot") {
+            rot = std::unique_ptr<Vec3Expression>(dynamic_cast<Vec3Expression*>(value));
+        }
+        
+    }
+    if (value->getExprType() == token_type::SCALAR) {
+        if (key == "scale") {
+            scale = std::unique_ptr<NumberExpression>(dynamic_cast<NumberExpression*>(value));
+        }
+    }
+}
+
+std::string replaceAll(std::string s, const std::string& sequence, const std::string& toReplace)
+{
+    size_t pos = 0;
+    while ((pos = s.find(sequence, pos)) != std::string::npos) {
+        s.replace(pos, sequence.size(), toReplace);
+        pos += toReplace.size();
+    }
+    return s;
+}
+
+std::wstring Parser::PointExpression::print(bool isLast, const std::wstring& prefix)
+{
+    return prefix + L"└── point \n";
+}
+
+std::string Parser::PointExpression::emit()
+{
+    return "POINT";
+}
+
+std::unique_ptr<expression> Parser::PointExpression::getAsRHS()
+{
+    return std::make_unique<PointExpression>();
+}
+
+token_type Parser::PointExpression::getExprType()
+{
+    return token_type::POINT;
+}
+
+expressionType Parser::PointExpression::getType()
+{
+    return expressionType::POINT;
+}
+
+expression* Parser::PointExpression::getProperty(std::string key)
+{
+    if (key == "x") {
+        return x.get();
+    }
+    if (key == "y") {
+        return y.get();
+    }
+    if (key == "z") {
+        return z.get();
+    }
+    return nullptr;
+}
+
+void Parser::PointExpression::setProperty(std::string key, expression* value)
+{
+}
+
+std::wstring Parser::assignPropertyStatement::print(bool isLast, const std::wstring& prefix)
+{
+    return std::wstring();
+}
+
+std::string Parser::assignPropertyStatement::emit()
+{
+    return std::string();
+}
+
+std::wstring Parser::PointXExpression::print(bool isLast, const std::wstring& prefix)
+{
+    return std::wstring();
+}
+
+std::string Parser::PointXExpression::emit()
+{
+    return "POINT.x";
+}
+
+std::unique_ptr<expression> Parser::PointXExpression::getAsRHS()
+{
+    return std::unique_ptr<PointXExpression>();
+}
+
+token_type Parser::PointXExpression::getExprType()
+{
+    return token_type::SCALAR;
+}
+
+expressionType Parser::PointXExpression::getType()
+{
+    return expressionType::POINT;
+}
+
+expression* Parser::PointXExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+
+void Parser::PointXExpression::setProperty(std::string key, expression* value)
+{
+}
+
+std::wstring Parser::PointZExpression::print(bool isLast, const std::wstring& prefix)
+{
+    return std::wstring();
+}
+
+std::string Parser::PointZExpression::emit()
+{
+    return "POINT.z";
+}
+
+std::unique_ptr<expression> Parser::PointZExpression::getAsRHS()
+{
+    return std::unique_ptr<PointZExpression>();
+}
+
+token_type Parser::PointZExpression::getExprType()
+{
+    return token_type::POINT;
+}
+
+expressionType Parser::PointZExpression::getType()
+{
+    return expressionType::VEC3;
+}
+
+expression* Parser::PointZExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+
+void Parser::PointZExpression::setProperty(std::string key, expression* value)
+{
+}
+
+std::wstring Parser::PointYExpression::print(bool isLast, const std::wstring& prefix)
+{
+    return std::wstring();
+}
+
+std::string Parser::PointYExpression::emit()
+{
+    return "POINT.y";
+}
+
+std::unique_ptr<expression> Parser::PointYExpression::getAsRHS()
+{
+    return std::unique_ptr<PointYExpression>();
+}
+
+token_type Parser::PointYExpression::getExprType()
+{
+    return token_type::POINT;
+}
+
+expressionType Parser::PointYExpression::getType()
+{
+    return expressionType::VEC3;
+}
+
+expression* Parser::PointYExpression::getProperty(std::string key)
+{
+    return nullptr;
+}
+
+void Parser::PointYExpression::setProperty(std::string key, expression* value)
+{
+}
+
+std::wstring Parser::AccessPropertyExpr::print(bool isLast, const std::wstring& prefix)
+{
+    return std::wstring();
+}
+
+std::string Parser::AccessPropertyExpr::emit()
+{
+
+    return lhs->getProperty(propertyName)->emit();
+}
+
+std::unique_ptr<expression> Parser::AccessPropertyExpr::getAsRHS()
+{
+    return lhs->getProperty(propertyName)->getAsRHS();
+}
+
+token_type Parser::AccessPropertyExpr::getExprType()
+{
+    return lhs->getProperty(propertyName)->getExprType();
+}
+
+expressionType Parser::AccessPropertyExpr::getType()
+{
+    return expressionType::ACCESS;
+}
+
+expression* Parser::AccessPropertyExpr::getProperty(std::string key)
+{
+    return lhs->getProperty(propertyName)->getProperty(key);
+}
+
+void Parser::AccessPropertyExpr::setProperty(std::string key, expression* value)
+{
+    lhs->getProperty(propertyName)->setProperty(key,value);
 }
