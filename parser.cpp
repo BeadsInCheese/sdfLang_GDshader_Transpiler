@@ -46,7 +46,11 @@ std::wstring Parser::IdentifierExpression::print(bool isLast, const std::wstring
 }
 std::string Parser::IdentifierExpression::emit()
 {
-    return identifier;
+    return (*variables)[identifier].value->emit();
+}
+std::unique_ptr<expression> Parser::IdentifierExpression::getAsRHS()
+{
+    return (*variables)[identifier].value->getAsRHS();
 }
 std::wstring Parser::NumberExpression::print(bool isLast, const std::wstring& prefix)
 {
@@ -56,6 +60,14 @@ std::string Parser::NumberExpression::emit()
 {
     return std::to_string(number);
 }
+std::unique_ptr<expression> Parser::NumberExpression::getAsRHS()
+{
+
+    return std::make_unique<NumberExpression>(number);
+}
+std::unique_ptr<expression> expression::getAsRHS(){
+    return std::make_unique<expression>();
+}
 std::wstring expression::print(bool isLast, const std::wstring& prefix)
 {
     return prefix+ L"└── default expression. Some error has happened during parsing\n";
@@ -64,6 +76,10 @@ std::wstring expression::print(bool isLast, const std::wstring& prefix)
 
 Parser::NumberExpression::NumberExpression(std::string value) {
     number = std::stof(value);
+}
+Parser::NumberExpression::NumberExpression(float value):number(value)
+{
+    
 }
 std::wstring Parser::BinaryExpression::print(bool isLast, const std::wstring& prefix)
 {
@@ -106,6 +122,15 @@ std::string Parser::BinaryExpression::emit()
     return code;
 }
 
+std::unique_ptr<expression> Parser::BinaryExpression::getAsRHS()
+{
+    std::unique_ptr<BinaryExpression> b = std::make_unique<BinaryExpression>();
+    b->rhs = rhs->getAsRHS();
+    b->lhs = lhs->getAsRHS();
+    b->oper = oper;
+    return std::move(b);
+}
+
 std::wstring Parser::UnaryExpression::print(bool isLast, const std::wstring& prefix)
 {
     std::wstring out = prefix + (isLast ? L"└── " : L"├── ")
@@ -131,6 +156,14 @@ std::string Parser::UnaryExpression::emit()
         break;
     }
     return code;
+}
+
+std::unique_ptr<expression> Parser::UnaryExpression::getAsRHS()
+{
+    std::unique_ptr<UnaryExpression> unary = std::make_unique<UnaryExpression>();
+    unary->oper = oper;
+    unary->rhs = rhs->getAsRHS();
+    return std::move(unary);
 }
 
 
@@ -227,6 +260,9 @@ std::unique_ptr<statement> Parser::parseStatement(std::vector<token>& tokens, in
     std::string s = look(tokens, ptr).token_to_string(look(tokens, ptr).typ);
     std::wcout << L"parse statement.\n"+ std::wstring(s.begin(),s.end());
     if (look(tokens, ptr).typ == token_type::VEC2 || look(tokens, ptr).typ == token_type::VEC3 || look(tokens, ptr).typ == token_type::VEC4 || look(tokens, ptr).typ == token_type::SCALAR || look(tokens, ptr).typ == token_type::SHAPE) {
+        return parseDeclarationStatement(tokens, ptr);
+    }
+    if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
         return parseAssignmentStatement(tokens, ptr);
     }
     if (look(tokens, ptr).typ == token_type::RETURN) {
@@ -249,9 +285,8 @@ std::unique_ptr <statement> Parser::parseBlockStatement(std::vector<token>& toke
 
 std::unique_ptr < statement> Parser::parseAssignmentStatement(std::vector<token>& tokens, int& ptr) {
     std::unique_ptr<assignmentStatement> assignment=std::make_unique<assignmentStatement>();
-    std::string w=consume(tokens, ptr).val;
-    std::wcout << std::wstring(w.begin(),w.end());
-    assignment->lhs = parseExpression(tokens, ptr,-1);
+    
+    assignment->lhs = parseIdentifierExpression(tokens, ptr);
     token t = expect(tokens, ptr, token_type::ASSIGN);
     assignment->rhs = parseExpression(tokens, ptr,-1);
     expect(tokens, ptr, token_type::SEMICOLON);
@@ -294,7 +329,7 @@ std::string statement::emit()
 }
 std::string expression::emit()
 {
-    return std::string("");
+    return std::string("ERROR");
 }
 std::wstring Parser::assignmentStatement::print(bool isLast, const std::wstring& prefix)
 {
@@ -308,7 +343,8 @@ std::wstring Parser::assignmentStatement::print(bool isLast, const std::wstring&
 }
 std::string Parser::assignmentStatement::emit()
 {
-    return rhs->emit()+"="+lhs->emit()+";";
+    (*lhs->variables)[lhs->identifier].value = rhs->getAsRHS();
+    return "";
 }
 std::wstring Parser::blockStatement::print(bool isLast, const std::wstring& prefix)
 {
@@ -366,7 +402,8 @@ Parser::declarationStatement::declarationStatement(
 
 std::wstring Parser::declarationStatement::print(bool isLast, const std::wstring& prefix)
 {
-    std::wstring out = prefix + (isLast ? L"└── " : L"├── ") + L"declare" + L"\n";
+    std::string t = type_information.token_to_string(type_information.typ);
+    std::wstring out = prefix + (isLast ? L"└── " : L"├── ") + L"declare " + std::wstring(t.begin(),t.end()) + L"\n";
 
     std::wstring childPrefix = prefix + (isLast ? L"    " : L"│   ");
     out += lhs->print(true, childPrefix);
@@ -378,7 +415,7 @@ std::string Parser::declarationStatement::emit()
 {
     NamedValue n;
     n.type_information = type_information.typ;
-    n.value = std::make_unique<expression>(*rhs.get());
+    n.value = rhs->getAsRHS();
     n.position[0] = 0.0f; 
     n.position[1] = 0.0f;
     n.position[2] = 0.0f;

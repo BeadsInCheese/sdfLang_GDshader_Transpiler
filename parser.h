@@ -15,6 +15,7 @@ class expression {
 public:
     virtual std::wstring print(bool isLast, const std::wstring& prefix);
     virtual std::string emit();
+    virtual std::unique_ptr<expression> getAsRHS();
 };
 
 struct NamedValue {
@@ -41,6 +42,7 @@ public:
         token oper=token(token_type::PLUS,"");
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
     };
     class UnaryExpression :public expression {
     public:
@@ -48,6 +50,7 @@ public:
         token oper = token(token_type::PLUS, "");
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
     };
     class IdentifierExpression :public expression {
     public:
@@ -56,13 +59,16 @@ public:
         IdentifierExpression(std::string v, std::unordered_map<std::string, NamedValue>* variables);
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
     };
     class NumberExpression :public expression {
     public:
         float number;
         NumberExpression(std::string value);
+        NumberExpression(float value);
         std::wstring print(bool isLast,const std::wstring& prefix) override;
         std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
     };
     class ExpressionStatement :public statement {
     public:
@@ -77,7 +83,7 @@ public:
     };
     class assignmentStatement :public statement {
     public:
-        std::unique_ptr<expression> lhs;
+        std::unique_ptr<IdentifierExpression> lhs;
         std::unique_ptr<expression> rhs;
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
