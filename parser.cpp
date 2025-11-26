@@ -52,6 +52,10 @@ std::unique_ptr<expression> Parser::IdentifierExpression::getAsRHS()
 {
     return (*variables)[identifier].value->getAsRHS();
 }
+token_type Parser::IdentifierExpression::getExprType()
+{
+    return (*variables)[identifier].type_information;
+}
 std::wstring Parser::NumberExpression::print(bool isLast, const std::wstring& prefix)
 {
     return prefix+ L"└── "+std::to_wstring(number) + L"\n";
@@ -65,8 +69,16 @@ std::unique_ptr<expression> Parser::NumberExpression::getAsRHS()
 
     return std::make_unique<NumberExpression>(number);
 }
+token_type Parser::NumberExpression::getExprType()
+{
+    return token_type::SCALAR;
+}
 std::unique_ptr<expression> expression::getAsRHS(){
     return std::make_unique<expression>();
+}
+token_type expression::getExprType()
+{
+    return token_type::END_OF_FILE;
 }
 std::wstring expression::print(bool isLast, const std::wstring& prefix)
 {
@@ -131,6 +143,28 @@ std::unique_ptr<expression> Parser::BinaryExpression::getAsRHS()
     return std::move(b);
 }
 
+token_type Parser::BinaryExpression::getExprType()
+{
+    token_type l = lhs->getExprType();
+    token_type r = rhs->getExprType();
+    if (l == token_type::SCALAR && l == token_type::SCALAR) {
+        return token_type::SCALAR;
+    }
+    if (l == token_type::VEC2 && l == token_type::VEC2) {
+        return token_type::VEC2;
+    }
+    if (l == token_type::VEC3 && l == token_type::VEC3) {
+        return token_type::VEC3;
+    }
+    if (l == token_type::VEC4 && l == token_type::VEC4) {
+        return token_type::VEC4;
+    }
+    if (l == token_type::SHAPE && l == token_type::SHAPE) {
+        return token_type::SHAPE;
+    }
+    return token_type();
+}
+
 std::wstring Parser::UnaryExpression::print(bool isLast, const std::wstring& prefix)
 {
     std::wstring out = prefix + (isLast ? L"└── " : L"├── ")
@@ -164,6 +198,11 @@ std::unique_ptr<expression> Parser::UnaryExpression::getAsRHS()
     unary->oper = oper;
     unary->rhs = rhs->getAsRHS();
     return std::move(unary);
+}
+
+token_type Parser::UnaryExpression::getExprType()
+{
+    return rhs->getExprType();
 }
 
 
@@ -201,6 +240,10 @@ std::unique_ptr<expression> Parser::parseUnaryExpression(std::vector<token>& tok
         return parseNumberExpression(tokens,ptr);
 
     }
+    else if (look(tokens, ptr).typ == token_type::VEC2) {
+       return parseNumberExpression(tokens, ptr);
+
+   }
     else if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
         return parseIdentifierExpression(tokens,ptr);
 
@@ -432,3 +475,120 @@ std::string Parser::declarationStatement::emit()
 };
 
 
+
+Parser::Vec2Expression::Vec2Expression(expression* value, expression* value2)
+{
+    x = value->getAsRHS();
+    y = value2->getAsRHS();
+}
+
+std::wstring Parser::Vec2Expression::print(bool isLast, const std::wstring& prefix)
+{
+    return  prefix + L"└── vec2()";
+}
+
+std::string Parser::Vec2Expression::emit()
+{
+    return "vec2(" + x->emit() + "," + y->emit() + ")";
+}
+
+std::unique_ptr<expression> Parser::Vec2Expression::getAsRHS()
+{
+    return std::make_unique<Vec2Expression>(x.get(), y.get());
+}
+
+token_type Parser::Vec2Expression::getExprType()
+{
+    return token_type::VEC2;
+}
+
+
+
+Parser::Vec3Expression::Vec3Expression(expression* value,expression* value2, expression* value3)
+{
+    x = value->getAsRHS();
+    y = value2->getAsRHS();
+    z = value3->getAsRHS();
+}
+
+std::wstring Parser::Vec3Expression::print(bool isLast, const std::wstring& prefix)
+{
+    return  prefix + L"└── vec3()";
+}
+
+std::string Parser::Vec3Expression::emit()
+{
+    return "vec3(" + x->emit() + "," + y->emit() + ","+z->emit() + ")";
+}
+
+std::unique_ptr<expression> Parser::Vec3Expression::getAsRHS()
+{
+    return std::make_unique<Vec3Expression>(x.get(), y.get(), z.get());
+}
+
+token_type Parser::Vec3Expression::getExprType()
+{
+    return token_type::VEC3;
+}
+
+
+Parser::Vec4Expression::Vec4Expression(expression* value, expression* value2, expression* value3, expression* value4)
+{
+    
+    x = value->getAsRHS();
+    y = value2->getAsRHS();
+    z = value3->getAsRHS();
+    w= value4->getAsRHS();
+
+}
+
+std::wstring Parser::Vec4Expression::print(bool isLast, const std::wstring& prefix)
+{
+    return  L"└──vec4()";
+}
+
+std::string Parser::Vec4Expression::emit()
+{
+    return "vec4(" + x->emit() + "," + y->emit() + "," + z->emit() + w->emit() + ")";
+}
+
+std::unique_ptr<expression> Parser::Vec4Expression::getAsRHS()
+{
+    return std::make_unique<Vec4Expression>(x.get(), y.get(), z.get(), w.get());
+}
+
+token_type Parser::Vec4Expression::getExprType()
+{
+    return token_type::VEC4;
+}
+
+Parser::ShapeExpression::ShapeExpression(expression* SDF)
+{
+    sdf = SDF->getAsRHS();
+
+}
+
+std::wstring Parser::ShapeExpression::print(bool isLast, const std::wstring& prefix)
+{
+    return prefix + L"└── shape \n";
+}
+
+std::string Parser::ShapeExpression::emit()
+{
+    return std::string("shape: ")+sdf->emit();
+}
+
+std::unique_ptr<expression> Parser::ShapeExpression::getAsRHS()
+{
+    auto shape=std::make_unique<ShapeExpression>(sdf.get());
+    std::copy(std::begin(rot), std::end(rot), shape->rot);
+    std::copy(std::begin(pos), std::end(pos), shape->pos);
+    std::copy(std::begin(scale), std::end(scale), shape->scale);
+    
+    return std::move(shape);
+}
+
+token_type Parser::ShapeExpression::getExprType()
+{
+    return token_type::SHAPE;
+}

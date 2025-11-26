@@ -13,6 +13,7 @@ public:
 class expression {
     enum oper { PLUS, MINUS, DIV, MUL, DOT, CROSS };
 public:
+    virtual token_type getExprType();
     virtual std::wstring print(bool isLast, const std::wstring& prefix);
     virtual std::string emit();
     virtual std::unique_ptr<expression> getAsRHS();
@@ -43,6 +44,7 @@ public:
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
     };
     class UnaryExpression :public expression {
     public:
@@ -51,6 +53,7 @@ public:
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
     };
     class IdentifierExpression :public expression {
     public:
@@ -60,6 +63,7 @@ public:
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
     };
     class NumberExpression :public expression {
     public:
@@ -69,6 +73,52 @@ public:
         std::wstring print(bool isLast,const std::wstring& prefix) override;
         std::string emit()override;
         std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+    };
+    class Vec2Expression :public expression {
+    public:
+        std::unique_ptr<expression> x;
+        std::unique_ptr<expression> y;
+        Vec2Expression(expression* value, expression* value2);
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+    };
+    class Vec3Expression :public expression {
+    public:
+        std::unique_ptr<expression> x;
+        std::unique_ptr<expression> y;
+        std::unique_ptr<expression> z;
+        Vec3Expression(expression* value, expression* value2, expression* value3);
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+    };
+    class Vec4Expression :public expression {
+    public:
+        std::unique_ptr<expression> x;
+        std::unique_ptr<expression> y;
+        std::unique_ptr<expression> z;
+        std::unique_ptr<expression> w;
+        Vec4Expression(expression* value, expression* value2, expression* value3, expression* value4);
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
+    };
+    class ShapeExpression :public expression {
+    public:
+        std::unique_ptr<expression> sdf;
+        float rot[3] = {};
+        float pos[3] = {};
+        float scale[3] = {};
+        ShapeExpression(expression* SDF);
+        std::wstring print(bool isLast, const std::wstring& prefix) override;
+        std::string emit()override;
+        std::unique_ptr<expression> getAsRHS() override;
+        token_type getExprType()override;
     };
     class ExpressionStatement :public statement {
     public:
