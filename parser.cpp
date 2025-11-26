@@ -276,6 +276,13 @@ std::unique_ptr<expression> Parser::parseUnaryExpression(std::vector<token>& tok
        return std::make_unique<Vec4Expression>(param1.get(), param2.get(), param3.get(),param4.get());
 
    }
+    else if (look(tokens, ptr).typ == token_type::SHAPE) {
+       consume(tokens, ptr);
+       expect(tokens, ptr, token_type::OPENPAREN);
+       std::unique_ptr<expression> param1 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::CLOSINGPAREN);
+       return std::make_unique<ShapeExpression>(param1.get());
+   }
     else if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
         return parseIdentifierExpression(tokens,ptr);
 
@@ -601,6 +608,9 @@ token_type Parser::Vec4Expression::getExprType()
 Parser::ShapeExpression::ShapeExpression(expression* SDF)
 {
     sdf = SDF->getAsRHS();
+    rot = std::make_unique<Vec3Expression>(std::make_unique < NumberExpression>(0).get(), std::make_unique < NumberExpression>(0).get(), std::make_unique < NumberExpression>(0).get());
+    pos = std::make_unique<Vec3Expression>(std::make_unique < NumberExpression>(0).get(), std::make_unique < NumberExpression>(0).get(), std::make_unique < NumberExpression>(0).get());
+    scale = std::make_unique<NumberExpression>(1);
 
 }
 
@@ -617,10 +627,9 @@ std::string Parser::ShapeExpression::emit()
 std::unique_ptr<expression> Parser::ShapeExpression::getAsRHS()
 {
     auto shape=std::make_unique<ShapeExpression>(sdf.get());
-    std::copy(std::begin(rot), std::end(rot), shape->rot);
-    std::copy(std::begin(pos), std::end(pos), shape->pos);
-    std::copy(std::begin(scale), std::end(scale), shape->scale);
-    
+    shape->rot = cast_unique<expression,Vec3Expression>(rot->getAsRHS());
+    shape->pos = cast_unique<expression, Vec3Expression>(pos->getAsRHS());
+    shape->scale = cast_unique<expression, NumberExpression>(scale->getAsRHS());
     return std::move(shape);
 }
 

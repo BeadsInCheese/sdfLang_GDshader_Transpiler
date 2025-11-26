@@ -5,6 +5,13 @@
 #include "token.h"
 #include <unordered_map>
 #include <string>
+template <typename T,typename U>
+std::unique_ptr<U> cast_unique(std::unique_ptr<T> ptr){
+    if (U* raw = dynamic_cast<U*>(ptr.release())) {
+        return std::unique_ptr<U>(raw);
+    }
+    std::wcout<<L"ERROR Cast failed"<<"\n";
+}
 class statement {
 public:
     virtual std::wstring print(bool isLast, const std::wstring& prefix);
@@ -111,9 +118,9 @@ public:
     class ShapeExpression :public expression {
     public:
         std::unique_ptr<expression> sdf;
-        float rot[3] = {};
-        float pos[3] = {};
-        float scale[3] = {};
+        std::unique_ptr<Vec3Expression> rot;
+        std::unique_ptr<Vec3Expression> pos;
+        std::unique_ptr<NumberExpression> scale;
         ShapeExpression(expression* SDF);
         std::wstring print(bool isLast, const std::wstring& prefix) override;
         std::string emit()override;
