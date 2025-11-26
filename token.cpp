@@ -47,8 +47,11 @@ std::string token::token_to_string(token_type t) {
         return std::string("EOF");
     case token_type::UNION:
         return std::string("UNION");
+    
     case token_type::INTERSECTION:
         return std::string("INTERSECTION");
+    case token_type::COMMA:
+        return std::string("COMMA");
     default:
         return "Fail";
         break;

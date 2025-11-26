@@ -27,7 +27,7 @@ struct NamedValue {
     float scale[3];
 };
 class Parser {
-    std::unordered_map<token_type, int> bindingPowers = { {token_type::PLUS,1 },{token_type::MINUS,1 },{token_type::MUL,3 },{token_type::DIV,3 },{token_type::OPENPAREN,-1 },{token_type::UNION,1 },{token_type::INTERSECTION,1 } };
+    std::unordered_map<token_type, int> bindingPowers = { {token_type::PLUS,1 },{token_type::MINUS,1 },{token_type::MUL,3 },{token_type::DIV,3 },{token_type::OPENPAREN,-1 },{token_type::COMMA,-1 },{token_type::UNION,1 },{token_type::INTERSECTION,1 } };
 public:
     std::shared_ptr<std::unordered_map<std::string, NamedValue>> variables = std::make_shared<std::unordered_map<std::string, NamedValue>>();
     bool isOperation(token_type t);
@@ -158,6 +158,7 @@ public:
     std::unique_ptr<expression> parseUnaryExpression(std::vector<token>& tokens, int& ptr);
     std::unique_ptr<expression> parseBinaryExpression(std::vector<token>& tokens, int& ptr,std::unique_ptr<expression> lhs);
     std::unique_ptr<expression> parseExpression(std::vector<token>& tokens, int& ptr,int bp);
+    std::unique_ptr<expression> parseExpression(std::vector<token>& tokens, int& ptr);
 
     std::unique_ptr<expression> parseNumberExpression(std::vector<token>& tokens, int& ptr);
     std::unique_ptr<IdentifierExpression> parseIdentifierExpression(std::vector<token>& tokens, int& ptr);

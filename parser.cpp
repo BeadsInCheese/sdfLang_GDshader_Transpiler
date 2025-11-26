@@ -62,7 +62,7 @@ std::wstring Parser::NumberExpression::print(bool isLast, const std::wstring& pr
 }
 std::string Parser::NumberExpression::emit()
 {
-    return std::to_string(number);
+    return "{"+std::to_string(number)+"}";
 }
 std::unique_ptr<expression> Parser::NumberExpression::getAsRHS()
 {
@@ -241,7 +241,39 @@ std::unique_ptr<expression> Parser::parseUnaryExpression(std::vector<token>& tok
 
     }
     else if (look(tokens, ptr).typ == token_type::VEC2) {
-       return parseNumberExpression(tokens, ptr);
+       consume(tokens, ptr);
+       expect(tokens, ptr, token_type::OPENPAREN);
+       std::unique_ptr<expression> param1 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::COMMA);
+       std::unique_ptr<expression> param2 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::CLOSINGPAREN);
+       return std::make_unique<Vec2Expression>(param1.get(),param2.get());
+
+   }
+    else if (look(tokens, ptr).typ == token_type::VEC3) {
+       consume(tokens, ptr);
+       expect(tokens, ptr, token_type::OPENPAREN);
+       std::unique_ptr<expression> param1 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::COMMA);
+       std::unique_ptr<expression> param2 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::COMMA);
+       std::unique_ptr<expression> param3 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::CLOSINGPAREN);
+       return std::make_unique<Vec3Expression>(param1.get(), param2.get(),param3.get());
+
+   }
+    else if (look(tokens, ptr).typ == token_type::VEC4) {
+       consume(tokens, ptr);
+       expect(tokens, ptr, token_type::OPENPAREN);
+       std::unique_ptr<expression> param1 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::COMMA);
+       std::unique_ptr<expression> param2 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::COMMA);
+       std::unique_ptr<expression> param3 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::COMMA);
+       std::unique_ptr<expression> param4 = parseExpression(tokens, ptr);
+       expect(tokens, ptr, token_type::CLOSINGPAREN);
+       return std::make_unique<Vec4Expression>(param1.get(), param2.get(), param3.get(),param4.get());
 
    }
     else if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
@@ -283,6 +315,10 @@ std::unique_ptr<expression> Parser::parseExpression(std::vector<token>& tokens, 
         
     std::cout << "ERROR could not parse expression.\n"; 
     return std::make_unique<expression>();
+}
+std::unique_ptr<expression> Parser::parseExpression(std::vector<token>& tokens, int& ptr)
+{
+    return parseExpression(tokens, ptr, -1);
 }
 std::unique_ptr<Parser::IdentifierExpression> Parser::parseIdentifierExpression(std::vector<token>& tokens, int& ptr) {
     return std::make_unique<IdentifierExpression>(consume(tokens, ptr).val,variables.get());
@@ -484,7 +520,7 @@ Parser::Vec2Expression::Vec2Expression(expression* value, expression* value2)
 
 std::wstring Parser::Vec2Expression::print(bool isLast, const std::wstring& prefix)
 {
-    return  prefix + L"└── vec2()";
+    return  prefix + L"└── vec2()\n";
 }
 
 std::string Parser::Vec2Expression::emit()
@@ -513,7 +549,7 @@ Parser::Vec3Expression::Vec3Expression(expression* value,expression* value2, exp
 
 std::wstring Parser::Vec3Expression::print(bool isLast, const std::wstring& prefix)
 {
-    return  prefix + L"└── vec3()";
+    return  prefix + L"└── vec3()\n";
 }
 
 std::string Parser::Vec3Expression::emit()
@@ -544,7 +580,7 @@ Parser::Vec4Expression::Vec4Expression(expression* value, expression* value2, ex
 
 std::wstring Parser::Vec4Expression::print(bool isLast, const std::wstring& prefix)
 {
-    return  L"└──vec4()";
+    return prefix + L"└──vec4()\n";
 }
 
 std::string Parser::Vec4Expression::emit()
@@ -577,7 +613,7 @@ std::string Parser::ShapeExpression::emit()
 {
     return std::string("shape: ")+sdf->emit();
 }
-
+     
 std::unique_ptr<expression> Parser::ShapeExpression::getAsRHS()
 {
     auto shape=std::make_unique<ShapeExpression>(sdf.get());

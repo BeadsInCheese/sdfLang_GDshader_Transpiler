@@ -89,6 +89,11 @@ std::vector<token> tokenizer::tokenize(std::string source) {
             ptr++;
             continue;
         }
+        else if (source[ptr] == ',') {
+            tokens.push_back(token(token_type::COMMA, ","));
+            ptr++;
+            continue;
+        }
         else if (source[ptr] == '.') {
             tokens.push_back(token(token_type::DOT, "."));
             ptr++;
