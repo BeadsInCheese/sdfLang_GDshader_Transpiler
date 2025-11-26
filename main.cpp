@@ -1,14 +1,14 @@
-#define NOMINMAX
-#include "lexer.h"    // 1. Your Project Headers
+
+#include "lexer.h"    
 #include "parser.h"
 
-#include <iostream>   // 2. C++ Standard Library
+#include <iostream>   
 #include <vector>
 #include <fstream>
 #include <string>
 #include <sstream>
 
-#include <io.h>       // 3. C/System Specific Headers (Non-Standard)
+#include <io.h>       
 #include <fcntl.h>
 int main(){
     tokenizer t;
