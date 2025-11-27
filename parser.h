@@ -269,7 +269,7 @@ public:
     std::unique_ptr <statement> parseBlockStatement(std::vector<token>& tokens, int& ptr);
     std::unique_ptr < statement> parseAssignmentStatement(std::vector<token>& tokens, int& ptr);
     std::unique_ptr < statement> parseAssignPropertyStatement(std::vector<token>& tokens, int& ptr);
-    std::unique_ptr < expression> parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr);
+    std::unique_ptr < expression> parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr, expression* lhs);
     std::unique_ptr < statement> parseDeclarationStatement(std::vector<token>& tokens, int& ptr);
     std::unique_ptr < statement> parseReturnStatement(std::vector<token>& tokens, int& ptr);
 

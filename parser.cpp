@@ -303,7 +303,7 @@ void Parser::UnaryExpression::setProperty(std::string key, expression* value)
 std::unique_ptr<expression> Parser::parseNumberExpression(std::vector<token>& tokens, int& ptr){
     std::string num=expect(tokens, ptr, token_type::NUMBER).val;
 
-    if (peek(tokens, ptr).typ == token_type::DOT) {
+    if (look(tokens, ptr).typ == token_type::DOT) {
         expect(tokens, ptr, token_type::DOT);
         num += ".";
         num += expect(tokens, ptr, token_type::NUMBER).val;
@@ -375,9 +375,7 @@ std::unique_ptr<expression> Parser::parseUnaryExpression(std::vector<token>& tok
        return std::make_unique<ShapeExpression>(param1.get());
    }
     else if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
-       if (peek(tokens, ptr).typ == token_type::DOT) {
-           return parseAccessPropertyExpr(tokens,ptr);
-        }
+
         return parseIdentifierExpression(tokens,ptr);
 
     }
@@ -400,7 +398,11 @@ std::unique_ptr<expression> Parser::parseBinaryExpression(std::vector<token>& to
 }
 std::unique_ptr<expression> Parser::parseExpression(std::vector<token>& tokens, int& ptr,int bp) {
         std::unique_ptr<expression> first = parseUnaryExpression(tokens, ptr);
-        
+        if (look(tokens, ptr).typ == token_type::DOT) {
+            std::wcout << "PARSING MEMBER ACCESS\n";
+            expect(tokens, ptr, token_type::DOT);
+            first = parseAccessPropertyExpr(tokens, ptr,first.release());
+        }
         std::unique_ptr<expression> led=std::move(first);
         token oper = token(token_type::END_OF_FILE,"EOF");
         while (isOperation(look(tokens, ptr).typ) &&bindingPowers[look(tokens,ptr).typ] > bp) {
@@ -489,12 +491,16 @@ std::unique_ptr<statement> Parser::parseAssignPropertyStatement(std::vector<toke
     return std::move(assignment);
 }
 
-std::unique_ptr<expression> Parser::parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr)
+std::unique_ptr<expression> Parser::parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr,expression* lhs)
 {
     std::unique_ptr<AccessPropertyExpr> access = std::make_unique<AccessPropertyExpr>();
-    access->lhs = parseIdentifierExpression(tokens, ptr);
-    expect(tokens, ptr, token_type::DOT);
+    access->lhs = std::unique_ptr<expression>(lhs);
+    
     access->propertyName = consume(tokens, ptr).val;
+    if (look(tokens, ptr).typ == token_type::DOT) {
+        expect(tokens, ptr, token_type::DOT);
+        return parseAccessPropertyExpr(tokens, ptr, access.release());
+    }
     return std::move(access);
 }
 
