@@ -62,10 +62,11 @@ expressionType Parser::IdentifierExpression::getType()
 }
 expression* Parser::IdentifierExpression::getProperty(std::string key)
 {
-    return nullptr;
+    return (*variables)[identifier].value->getProperty(key);
 }
 void Parser::IdentifierExpression::setProperty(std::string key, expression* value)
 {
+    return (*variables)[identifier].value->setProperty(key, value);
 }
 std::wstring Parser::NumberExpression::print(bool isLast, const std::wstring& prefix)
 {
@@ -442,7 +443,7 @@ std::unique_ptr<statement> Parser::parseStatement(std::vector<token>& tokens, in
         return parseDeclarationStatement(tokens, ptr);
     }
     if (look(tokens, ptr).typ == token_type::IDENTIFIER) {
-        if (peek(tokens, ptr).typ == token_type::IDENTIFIER) {
+        if (peek(tokens, ptr).typ == token_type::DOT) {
             return parseAssignPropertyStatement(tokens,ptr);
         }
         return parseAssignmentStatement(tokens, ptr);
@@ -481,8 +482,8 @@ std::unique_ptr<statement> Parser::parseAssignPropertyStatement(std::vector<toke
 
     assignment->lhs = parseIdentifierExpression(tokens, ptr);
     expect(tokens, ptr, token_type::DOT);
-    assignment->property = parseIdentifierExpression(tokens, ptr)->identifier;
-    token t = expect(tokens, ptr, token_type::ASSIGN);
+    assignment->property = consume(tokens, ptr).val;
+    expect(tokens, ptr, token_type::ASSIGN);
     assignment->rhs = parseExpression(tokens, ptr, -1);
     expect(tokens, ptr, token_type::SEMICOLON);
     return std::move(assignment);
@@ -491,7 +492,7 @@ std::unique_ptr<statement> Parser::parseAssignPropertyStatement(std::vector<toke
 std::unique_ptr<expression> Parser::parseAccessPropertyExpr(std::vector<token>& tokens, int& ptr)
 {
     std::unique_ptr<AccessPropertyExpr> access = std::make_unique<AccessPropertyExpr>();
-    access->lhs = parseExpression(tokens, ptr);
+    access->lhs = parseIdentifierExpression(tokens, ptr);
     expect(tokens, ptr, token_type::DOT);
     access->propertyName = consume(tokens, ptr).val;
     return std::move(access);
@@ -673,10 +674,10 @@ void Parser::Vec2Expression::setProperty(std::string key, expression* value)
 {
     if (value->getExprType() == token_type::SCALAR) {
         if (key == "x") {
-            x = std::unique_ptr<expression>(value);
+            x = value->getAsRHS();
         }
         if (key == "y") {
-            y = std::unique_ptr<expression>(value);
+            y = value->getAsRHS();
         }
     }
     
@@ -735,13 +736,13 @@ void Parser::Vec3Expression::setProperty(std::string key, expression* value)
 {
     if (value->getExprType() == token_type::SCALAR) {
         if (key == "x") {
-            x = std::unique_ptr<expression>(value);
+            x = value->getAsRHS();
         }
         if (key == "y") {
-            y = std::unique_ptr<expression>(value);
+            y = value->getAsRHS();
         }
         if (key == "z") {
-            z = std::unique_ptr<expression>(value);
+            z = value->getAsRHS();
         }
     }
 }
@@ -803,16 +804,16 @@ void Parser::Vec4Expression::setProperty(std::string key, expression* value)
 {
     if (value->getExprType() == token_type::SCALAR) {
         if (key == "x") {
-            x = std::unique_ptr<expression>(value);
+            x = value->getAsRHS();
         }
         if (key == "y") {
-            y = std::unique_ptr<expression>(value);
+            y = value->getAsRHS();
         }
         if (key == "z") {
-            z = std::unique_ptr<expression>(value);
+            z = value->getAsRHS();
         }
         if (key == "w") {
-            w = std::unique_ptr<expression>(value);
+            w = value->getAsRHS();
         }
     }
 }
@@ -932,16 +933,16 @@ void Parser::ShapeExpression::setProperty(std::string key, expression* value)
 {
     if (value->getExprType() == token_type::VEC3) {
         if (key == "pos") {
-            pos = std::unique_ptr<Vec3Expression>(dynamic_cast<Vec3Expression*>(value));
+            pos = std::unique_ptr<Vec3Expression>(dynamic_cast<Vec3Expression*>(value->getAsRHS().release()));
         }
         if (key == "rot") {
-            rot = std::unique_ptr<Vec3Expression>(dynamic_cast<Vec3Expression*>(value));
+            rot = std::unique_ptr<Vec3Expression>(dynamic_cast<Vec3Expression*>(value->getAsRHS().release()));
         }
-        
     }
+    
     if (value->getExprType() == token_type::SCALAR) {
         if (key == "scale") {
-            scale = std::unique_ptr<NumberExpression>(dynamic_cast<NumberExpression*>(value));
+            scale = std::unique_ptr<NumberExpression>(dynamic_cast<NumberExpression*>(value->getAsRHS().release()));
         }
     }
 }
@@ -1006,6 +1007,7 @@ std::wstring Parser::assignPropertyStatement::print(bool isLast, const std::wstr
 
 std::string Parser::assignPropertyStatement::emit()
 {
+    lhs->setProperty(property, rhs.get());
     return std::string();
 }
 
